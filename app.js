@@ -2,6 +2,7 @@ var express = require('express');
 var shell = require('shelljs');
 var http = require('http');
 var fs = require('fs');
+var acmdl = require('./acmdl.js');
 var app = express();
 
 var getUISTPapers = function (req, res, next) {
@@ -18,12 +19,21 @@ var getCHIPapers = function (req, res, next) {
       })
 }
 
+var getPaperInfos = function(req, res, next){
+    getACMPaperInformations(req.params.firstPaperID, req.params.lastPaperId, function () {
+        res.sendStatus(200)
+        // res.send(data);
+      })
+}
+
 app.get('/downloadPDF/chi/:year/:firstPaperID/:lastPaperId', getCHIPapers);
 
 app.get('/downloadPDF/uist/:year/:firstPaperID/:lastPaperId', getUISTPapers);
 
+app.get('/getPaperInfos/:firstPaperID/:lastPaperId', getPaperInfos);
 
-app.listen(3000, function () {
+
+app.listen(4040, function () {
   console.log('Example app listening on port 3000!');
 });
 
@@ -104,4 +114,78 @@ var getUISTPDFS =function (year, firstPaperID, lastPaperId, callback) {
         callback();
 
     }
+}
+
+
+var getACMPaperInformations = function(firstPaperID, lastPaperId, callback)
+{
+    var paperId = firstPaperID;
+    
+    var myInterval = setInterval(function(){
+      if (paperId > lastPaperId ) 
+      {
+        clearInterval(myInterval);
+        console.log("Success");
+      }
+      else
+      {
+        console.log(paperId);
+        var wirteFile = function(obj, filename){
+           var json = JSON.stringify(obj)
+           fs.writeFile(filename, json, 'utf8', function(err){
+            if(err)
+              console.log(err)
+            }); 
+        }
+        var paperInfosFileName = 'PaperInfos/' + paperId + '.json'
+        var obj = {}
+        var count = 0;
+        var countNumber = 4;
+        obj.paperId = paperId
+
+        acmdl.getPaperReferenceByID(paperId, function (data) {
+          obj.reference = data
+          count++;
+          if(count >= countNumber)
+          {
+            wirteFile(obj, paperInfosFileName)
+          }
+        })
+
+        acmdl.getPaperCitationByID(paperId, function(data){
+          obj.citation = data;
+          count++;
+          if(count >= countNumber)
+          {
+            wirteFile(obj, paperInfosFileName)
+          }
+        });
+
+        acmdl.getPaperAbstractByID(paperId, function(abs, video){
+          obj.abstract = abs;
+          obj.video = video;
+          count++;
+          if(count >= countNumber)
+          {
+            wirteFile(obj, paperInfosFileName)
+          }
+        });
+
+        acmdl.getPaperTitleAndFileName(paperId, function(title, authors, conference, filename){
+          obj.title = title
+          obj.filename = filename
+          obj.authors = authors
+          obj.conference = conference
+          count++;
+          if(count >= countNumber)
+          {
+            wirteFile(obj, paperInfosFileName)
+          }
+        })
+
+        paperId++;
+      }
+    }, 20 * 1000); 
+    callback();
+  
 }
